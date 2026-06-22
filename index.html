@@ -453,10 +453,14 @@ function saveToStorage(){
   }catch(e){console.error('Firebase save error:',e);}
 }
 
+var fbListenersAttached=false;
 function loadFromStorage(){
+  if(fbListenersAttached) return;
+  fbListenersAttached=true;
   db.ref('psl2026/scores').on('value',function(snap){
     var v=snap.val();
     if(v) scores=v;
+    if(!curRole) return;
     renderTables();
     buildStatusDash();
     if(document.getElementById('pg-scoring')&&document.getElementById('pg-scoring').classList.contains('on')) buildScore();
@@ -545,6 +549,10 @@ function doLogin(){
 
 function doLogout(){
   curRole=null;refTieIdx=null;
+  db.ref('psl2026/scores').off();
+  db.ref('psl2026/lineups').off();
+  db.ref('psl2026/ko').off();
+  fbListenersAttached=false;
   document.getElementById('app-wrap').style.display='none';
   document.getElementById('login-page').style.display='flex';
   document.getElementById('inp-pin').value='';
