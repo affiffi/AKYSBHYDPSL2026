@@ -447,17 +447,17 @@ var db=firebase.database();
 
 function saveToStorage(){
   try{
-    // Strip undefined/empty values before saving to Firebase
     var cleanScores=JSON.parse(JSON.stringify(scores));
     var cleanLineups=JSON.parse(JSON.stringify(lineups));
     var cleanKo=JSON.parse(JSON.stringify(koData));
-    db.ref('psl2026/scores').set(cleanScores);
-    db.ref('psl2026/lineups').set(cleanLineups);
-    db.ref('psl2026/ko').set(cleanKo);
-  }catch(e){console.error('Firebase save error:',e);}
+    db.ref('psl2026/scores').set(cleanScores).catch(function(e){console.error('Scores save failed:',e);});
+    db.ref('psl2026/lineups').set(cleanLineups).catch(function(e){console.error('Lineups save failed:',e);});
+    db.ref('psl2026/ko').set(cleanKo).catch(function(e){console.error('KO save failed:',e);});
+  }catch(e){console.error('Save error:',e);}
 }
 
 var fbListenersAttached=false;
+var isSaving=false;
 function loadFromStorage(){
   if(fbListenersAttached) return;
   fbListenersAttached=true;
@@ -472,6 +472,11 @@ function loadFromStorage(){
   db.ref('psl2026/lineups').on('value',function(snap){
     var v=snap.val();
     if(v) lineups=v;
+    if(!curRole) return;
+    // Refresh scoring page if open so lineup names appear
+    if(document.getElementById('pg-scoring')&&document.getElementById('pg-scoring').classList.contains('on')) buildScore();
+    // Refresh lineup page if open
+    if(document.getElementById('pg-lineup')&&document.getElementById('pg-lineup').classList.contains('on')) renderLU();
   });
   db.ref('psl2026/ko').on('value',function(snap){
     var v=snap.val();
@@ -863,7 +868,7 @@ function buildScore(){
     var tgt=getMatchTarget(m.t);
     var target=tgt.target, sd=tgt.sd;
     var s=(sv.ms||[])[i]||{h:'',a:''};
-    var lu=lineups[luBase+'_'+i]||lineups[rkey+'_'+i]||{};
+    var lu=lineups[luBase+'_'+i]||lineups[rkey+'_'+i]||lineups['super_'+home+'_'+away+'_'+i]||lineups['plate_'+home+'_'+away+'_'+i]||{};
     var hL=[lu.h0,lu.h1].filter(function(x){return x;}).join(' / ')||home;
     var aL=[lu.a0,lu.a1].filter(function(x){return x;}).join(' / ')||away;
     var disabled=canEdit?'':' disabled';
