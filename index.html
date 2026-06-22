@@ -327,6 +327,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--dk
     <button class="nb" id="nb-tables" onclick="goPage('tables','nb-tables')"><span class="ni">📊</span>Tables</button>
     <button class="nb" id="nb-knockout" onclick="goPage('knockout','nb-knockout')"><span class="ni">🏆</span>KO</button>
   </nav>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </div>
 
 <script>
@@ -431,22 +434,44 @@ var KO_STRUCTURE={
 var lineups={}, scores={}, koData={};
 
 // ── LOCAL STORAGE ──
+// ── FIREBASE ──
+var firebaseConfig={
+  apiKey:"AIzaSyCvv6-sTDgsBQ5xjJemsgL2gk2g5nFC5CA",
+  authDomain:"akysbhydpsl2026.firebaseapp.com",
+  databaseURL:"https://akysbhydpsl2026-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"akysbhydpsl2026",
+  storageBucket:"akysbhydpsl2026.firebasestorage.app",
+  messagingSenderId:"463614306437",
+  appId:"1:463614306437:web:6cd983f2c71e5bbfe6a1ec"
+};
+firebase.initializeApp(firebaseConfig);
+var db=firebase.database();
+
 function saveToStorage(){
   try{
-    localStorage.setItem('psl2026_lineups',JSON.stringify(lineups));
-    localStorage.setItem('psl2026_scores',JSON.stringify(scores));
-    localStorage.setItem('psl2026_ko',JSON.stringify(koData));
-  }catch(e){}
+    db.ref('psl2026/scores').set(scores);
+    db.ref('psl2026/lineups').set(lineups);
+    db.ref('psl2026/ko').set(koData);
+  }catch(e){console.error('Firebase save error:',e);}
 }
+
 function loadFromStorage(){
-  try{
-    var l=localStorage.getItem('psl2026_lineups');
-    var s=localStorage.getItem('psl2026_scores');
-    var k=localStorage.getItem('psl2026_ko');
-    if(l) lineups=JSON.parse(l);
-    if(s) scores=JSON.parse(s);
-    if(k) koData=JSON.parse(k);
-  }catch(e){}
+  db.ref('psl2026/scores').on('value',function(snap){
+    var v=snap.val();
+    if(v) scores=v;
+    renderTables();
+    buildStatusDash();
+    if(document.getElementById('pg-scoring')&&document.getElementById('pg-scoring').classList.contains('on')) buildScore();
+  });
+  db.ref('psl2026/lineups').on('value',function(snap){
+    var v=snap.val();
+    if(v) lineups=v;
+  });
+  db.ref('psl2026/ko').on('value',function(snap){
+    var v=snap.val();
+    if(v) koData=v;
+    renderKO();
+  });
 }
 
 // ── LOGO HELPER ──
@@ -482,7 +507,7 @@ function doLogin(){
   var ok=false;
   if(role==='admin'&&pin===ADMIN_PIN) ok=true;
   else if(role==='referee'&&pin===REF_PIN) ok=true;
-  else if(role==='viewing'&&pin===VIEW_PIN) ok=true;
+  else if(role==='viewing') ok=true;
   if(!ok){err.textContent='Incorrect PIN. Please try again.';document.getElementById('inp-pin').value='';return;}
   if(role==='referee'){
     var tv=document.getElementById('sel-tie').value;
