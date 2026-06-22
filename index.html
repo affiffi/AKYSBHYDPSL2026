@@ -211,21 +211,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--dk
       <button class="sobt" onclick="doLogout()">Sign Out</button>
     </div>
     <div class="ig">
-      <div class="ic"><div class="il">Super tie</div><div class="iv">7 matches · to 11</div></div>
-      <div class="ic"><div class="il">Plate tie</div><div class="iv">8 matches · to 15</div></div>
+      <div class="ic"><div class="il">Singles</div><div class="iv">Game to 11 · win by 2</div></div>
+      <div class="ic"><div class="il">Doubles</div><div class="iv">Game to 15 · win by 2</div></div>
       <div class="ic"><div class="il">Match win</div><div class="iv">3 runs</div></div>
-      <div class="ic"><div class="il">Tie win</div><div class="iv">3 points</div></div>
+      <div class="ic"><div class="il">Tie win</div><div class="iv">3 points · draw = run diff</div></div>
     </div>
     <div class="sec">Match Status</div>
     <div id="status-dash" class="status-grid"></div>
     <div class="sec">Groups</div>
     <div class="gg" id="hgrp"></div>
-    <div class="sec">Group A Fixtures</div>
-    <div id="fgrpA"></div>
-    <div class="sec">Group B Fixtures</div>
-    <div id="fgrpB"></div>
-    <div class="sec">Group C Fixtures</div>
-    <div id="fgrpC"></div>
   </div>
 
   <!-- LINEUP -->
@@ -577,27 +571,6 @@ function buildHome(){
     gh+='</div>';
   }
   gc.innerHTML=gh;
-
-  // Render fixtures per group
-  ['A','B','C'].forEach(function(grpLetter){
-    var fixes=FIXES.filter(function(f){return f.group===grpLetter;});
-    var html='';
-    for(var i=0;i<fixes.length;i++){
-      var f=fixes[i];
-      var timeLabel=f.time==='TBD'
-        ?'<span style="color:#8a6000">📅 Date & time TBD</span>'
-        :'⏰ '+f.time+(f.day&&f.day!=='TBD'?' · '+f.day:'');
-      html+='<div class="fc">';
-      html+='<div class="ft" style="display:flex;justify-content:space-between;align-items:center">';
-      html+='<span>'+timeLabel+'</span>';
-      html+='<span style="font-size:9px;color:#3a5a40;font-weight:800;letter-spacing:.04em">'+f.id+'</span>';
-      html+='</div>';
-      html+='<div class="fr"><div class="ftm">'+lg(f.home,20)+'<span class="ftn">'+f.home+'</span></div><div class="fvs">VS</div><div class="ftm r"><span class="ftn">'+f.away+'</span>'+lg(f.away,20)+'</div></div>';
-      html+='</div>';
-    }
-    document.getElementById('fgrp'+grpLetter).innerHTML=html;
-  });
-
   buildStatusDash();
 }
 
@@ -611,15 +584,32 @@ function buildStatusDash(){
     var r=scores[rkey]||scores['plate_'+f.home+'_'+f.away];
     var done=false,prog=false;
     if(r&&r.ms){
-      var filled=0;
-      for(var j=0;j<r.ms.length;j++){if(r.ms[j].h!==''&&r.ms[j].a!=='')filled++;}
-      if(filled===r.ms.length&&filled>0) done=true;
-      else if(filled>0) prog=true;
+      var tot=r.ms.length;
+      var hw=r.hw||0,aw=r.aw||0;
+      var completedMatches=hw+aw;
+      if(completedMatches===tot&&tot>0) done=true;
+      else if(completedMatches>0) prog=true;
     }
     var cls=done?'status-card done':prog?'status-card prog':'status-card';
     var dot=done?'dot-done':prog?'dot-prog':'dot-idle';
     var status=done?'Complete':prog?'In progress':'Not started';
-    html+='<div class="'+cls+'"><div class="status-tie"><span class="status-dot '+dot+'"></span>'+f.home+' vs '+f.away+'</div><div class="status-score">Grp '+f.group+' · '+f.id+' · '+status+(r?' · '+( r.hw||0)+'-'+(r.aw||0):''  )+'</div></div>';
+    var scoreStr='';
+    if(r){
+      var hw=r.hw||0,aw=r.aw||0;
+      var isSuper=!!scores['super_'+f.home+'_'+f.away];
+      scoreStr=' · '+hw+'-'+aw;
+      if(done){
+        if(isSuper){
+          if(hw>=4) scoreStr+=' · <span style="color:#4cff8a">'+f.home+' win</span>';
+          else if(aw>=4) scoreStr+=' · <span style="color:#4cff8a">'+f.away+' win</span>';
+        } else {
+          if(hw>=5) scoreStr+=' · <span style="color:#4cff8a">'+f.home+' win</span>';
+          else if(aw>=5) scoreStr+=' · <span style="color:#4cff8a">'+f.away+' win</span>';
+          else if(hw===4&&aw===4) scoreStr+=' · <span style="color:#f0c030;font-weight:800">DRAW — run diff decides</span>';
+        }
+      }
+    }
+    html+='<div class="'+cls+'"><div class="status-tie"><span class="status-dot '+dot+'"></span>'+f.home+' vs '+f.away+'</div><div class="status-score">Grp '+f.group+' · '+f.id+' · '+status+scoreStr+'</div></div>';
   }
   el.innerHTML=html;
 }
@@ -909,21 +899,28 @@ function calcScore(){
   document.getElementById('sc-aw').textContent=aw;
 
   var tot=matches.length;
-  var allDone=true;
-  for(var i=0;i<ms.length;i++){if(ms[i].h===''||ms[i].a===''){allDone=false;break;}}
-  var plateDeuce=(div==='plate'&&hw===4&&aw===4&&allDone);
+  var completedMatches=hw+aw; // only matches with a valid winner count
+  var allDone=(completedMatches===tot);
   var wb=document.getElementById('sc-wb');
 
-  if(hw>Math.floor(tot/2)||(allDone&&hw>aw&&!plateDeuce)){
-    wb.textContent='🏆 '+home+' wins the tie · 3 points';wb.className='wb';
-  } else if(aw>Math.floor(tot/2)||(allDone&&aw>hw&&!plateDeuce)){
-    wb.textContent='🏆 '+away+' wins the tie · 3 points';wb.className='wb';
-  } else if(plateDeuce){
-    if(hRD>aRD){wb.textContent='🏆 '+home+' wins on run diff ('+hRD+' vs '+aRD+') · 3 pts';wb.className='wb';}
-    else if(aRD>hRD){wb.textContent='🏆 '+away+' wins on run diff ('+aRD+' vs '+hRD+') · 3 pts';wb.className='wb';}
-    else{wb.textContent='4–4 Equal run diff · Doubles playoff required';wb.className='wb rd';}
+  if(!allDone){
+    wb.textContent='In progress · '+hw+' – '+aw+' ('+completedMatches+'/'+tot+' matches done)';wb.className='wb p';
+  } else if(div==='super'){
+    // Super: all 7 done — 4+ wins = winner
+    if(hw>=4){wb.textContent='🏆 '+home+' wins the tie '+hw+'-'+aw+' · 3 points';wb.className='wb';}
+    else if(aw>=4){wb.textContent='🏆 '+away+' wins the tie '+aw+'-'+hw+' · 3 points';wb.className='wb';}
+    else{wb.textContent='Tied '+hw+'-'+aw+' · Run diff: '+home+' '+hRD+' vs '+away+' '+aRD;wb.className='wb rd';}
   } else {
-    wb.textContent='In progress · '+hw+' – '+aw;wb.className='wb p';
+    // Plate: all 8 done — 5+ wins = winner, 4-4 = run diff
+    if(hw>=5){wb.textContent='🏆 '+home+' wins the tie '+hw+'-'+aw+' · 3 points';wb.className='wb';}
+    else if(aw>=5){wb.textContent='🏆 '+away+' wins the tie '+aw+'-'+hw+' · 3 points';wb.className='wb';}
+    else if(hw===4&&aw===4){
+      if(hRD>aRD){wb.textContent='🏆 '+home+' wins on run diff ('+hRD+' vs '+aRD+') · 3 pts';wb.className='wb';}
+      else if(aRD>hRD){wb.textContent='🏆 '+away+' wins on run diff ('+aRD+' vs '+hRD+') · 3 pts';wb.className='wb';}
+      else{wb.textContent='4–4 · Equal run diff · Doubles playoff required';wb.className='wb rd';}
+    } else {
+      wb.textContent='Tied '+hw+'-'+aw+' · Run diff: '+home+' '+hRD+' vs '+away+' '+aRD;wb.className='wb rd';
+    }
   }
   buildStatusDash();
 }
@@ -978,9 +975,13 @@ function getSt(div){
     if(!fix) continue;
     var r=scores[rkey];
     if(!r||!r.ms) continue;
-    var filled=0;
-    for(var j=0;j<r.ms.length;j++){if(r.ms[j].h!==''&&r.ms[j].a!=='')filled++;}
-    if(filled===0) continue;
+    var matches=div==='super'?SM:PM;
+    var tot=matches.length;
+    var hw=r.hw||0,aw=r.aw||0;
+    var completedMatches=hw+aw;
+    // Only count this tie if all matches have a valid winner
+    if(completedMatches===0) continue;
+    // Accumulate RS/RA from all completed individual matches
     var hRS=0,aRS=0;
     for(var j=0;j<r.ms.length;j++){
       var s=r.ms[j];
@@ -988,12 +989,20 @@ function getSt(div){
     }
     st[fix.home].p++;st[fix.home].rs+=hRS;st[fix.home].ra+=aRS;
     st[fix.away].p++;st[fix.away].rs+=aRS;st[fix.away].ra+=hRS;
+    // Only award W/L/pts when all matches in the tie are complete
+    if(completedMatches!==tot) continue;
     var winner=null,loser=null;
-    if(r.hw>r.aw){winner=fix.home;loser=fix.away;}
-    else if(r.aw>r.hw){winner=fix.away;loser=fix.home;}
-    else if(div==='plate'&&r.hw===4&&r.aw===4){
-      if((r.hRD||0)>(r.aRD||0)){winner=fix.home;loser=fix.away;}
-      else if((r.aRD||0)>(r.hRD||0)){winner=fix.away;loser=fix.home;}
+    if(div==='super'){
+      if(hw>=4){winner=fix.home;loser=fix.away;}
+      else if(aw>=4){winner=fix.away;loser=fix.home;}
+    } else {
+      if(hw>=5){winner=fix.home;loser=fix.away;}
+      else if(aw>=5){winner=fix.away;loser=fix.home;}
+      else if(hw===4&&aw===4){
+        if((r.hRD||0)>(r.aRD||0)){winner=fix.home;loser=fix.away;}
+        else if((r.aRD||0)>(r.hRD||0)){winner=fix.away;loser=fix.home;}
+        // if still equal: no winner awarded (doubles playoff needed)
+      }
     }
     if(winner){st[winner].w++;st[winner].pts+=3;if(loser)st[loser].l++;}
   }
@@ -1158,41 +1167,136 @@ function buildKoMatchHTML(match,kd,div){
   var matches=div==='super'?SM:PM;
   var savedHome=kd.home||'';
   var savedAway=kd.away||'';
+  var mid=match.id;
 
-  // Build match scores
-  var scHTML='';
-  for(var i=0;i<matches.length;i++){
-    var s=(kd.scores||[])[i]||{h:'',a:''};
-    var ktgt=getMatchTarget(matches[i].t);
-    scHTML+='<div class="ko-scores"><div class="ko-match-name">'+(i+1)+'. '+matches[i].n+' <span style="color:#5a7a60;font-weight:400;font-size:9px">to '+ktgt.target+' (SD@'+ktgt.sd+')</span></div>';
-    scHTML+='<input class="ko-si" type="number" min="0" max="99" id="ko_'+match.id+'_h'+i+'" value="'+(s.h||'')+'" placeholder="0" inputmode="numeric" data-mid="'+match.id+'" data-div="'+div+'" '+dis+' oninput="calcKObyAttr(this)">';
-    scHTML+='<div class="ko-dash">–</div>';
-    scHTML+='<input class="ko-si" type="number" min="0" max="99" id="ko_'+match.id+'_a'+i+'" value="'+(s.a||'')+'" placeholder="0" inputmode="numeric" data-mid="'+match.id+'" data-div="'+div+'" '+dis+' oninput="calcKObyAttr(this)">';
-    scHTML+='</div>';
+  function teamOpts(selected){
+    var o='<option value="">— Select team —</option>';
+    for(var i=0;i<ALL_TEAMS.length;i++) o+='<option value="'+ALL_TEAMS[i]+'"'+(ALL_TEAMS[i]===selected?' selected':'')+'>'+ALL_TEAMS[i]+'</option>';
+    return o;
   }
 
-  // Player preview
-  var hPlayers=getKoPlayers(div,savedHome);
-  var aPlayers=getKoPlayers(div,savedAway);
+  function koMkOpts(team,mt,side,idx,slot){
+    var sq=div==='super'?SSQ:PSQ;
+    var plateSq=PSQ;
+    var pool=sq[team]||{m:[],f:[]};
+    var platePool=plateSq[team]||{m:[],f:[]};
+    var isPlateElig=(div==='super'&&(mt==='MD'||mt==='XD'));
+    var kkey=mid+'_'+side+'_'+idx+'_'+slot;
+    var cur=(kd.players&&kd.players[kkey])||'';
+    var used={};
+    for(var i=0;i<matches.length;i++){
+      if(i===idx) continue;
+      var pl=kd.players||{};
+      [0,1].forEach(function(sl){
+        var k2=mid+'_'+side+'_'+i+'_'+sl;
+        var p=pl[k2];
+        if(p){if(!used[p])used[p]=[];used[p].push(matches[i].t);}
+      });
+    }
+    var superList=mt==='MS'?(pool.m||[]):mt==='WS'?(pool.f||[]):mt==='WD'?(pool.f||[]):mt==='MD'?(pool.m||[]):(pool.m||[]).concat(pool.f||[]);
+    var plateList=isPlateElig?(mt==='MD'?(platePool.m||[]):(platePool.m||[]).concat(platePool.f||[])):[];
+    var superSet={};
+    for(var j=0;j<superList.length;j++) superSet[superList[j]]=true;
+    var dedupedPlate=plateList.filter(function(p){return !superSet[p];});
+    function isElig(p){
+      if(p===cur) return true;
+      var prev=used[p]||[];
+      if(prev.length>=2) return false;
+      if(prev.indexOf(mt)>=0) return false;
+      var isSing=(mt==='MS'||mt==='WS');
+      for(var x=0;x<prev.length;x++){if(isSing&&(prev[x]==='MS'||prev[x]==='WS'))return false;}
+      return true;
+    }
+    var opts='<option value="">— select —</option>';
+    if(isPlateElig){
+      opts+='<optgroup label="Super Players">';
+      for(var j=0;j<superList.length;j++){var p=superList[j];if(isElig(p))opts+='<option value="'+p+'"'+(p===cur?' selected':'')+'>'+p+'</option>';}
+      opts+='</optgroup><optgroup label="Plate Players ★">';
+      for(var j=0;j<dedupedPlate.length;j++){var p=dedupedPlate[j];if(isElig(p))opts+='<option value="'+p+'"'+(p===cur?' selected':'')+'>'+p+' ★</option>';}
+      opts+='</optgroup>';
+    } else {
+      for(var j=0;j<superList.length;j++){var p=superList[j];if(isElig(p))opts+='<option value="'+p+'"'+(p===cur?' selected':'')+'>'+p+'</option>';}
+    }
+    return opts;
+  }
+
+  var scHTML='';
+  for(var i=0;i<matches.length;i++){
+    var m=matches[i];
+    var s=(kd.scores||[])[i]||{h:'',a:''};
+    var ktgt=getMatchTarget(m.t);
+    var isD=(m.t==='MD'||m.t==='WD'||m.t==='XD');
+    var isPlateFill=(div==='super'&&(m.t==='MD'||m.t==='XD'));
+    scHTML+='<div class="mb">';
+    scHTML+='<div class="mn">'+(i+1)+'. '+m.n+(isPlateFill?' <span style="color:#c8900a;font-size:9px">★ Plate fill-in allowed</span>':'')+' <span style="color:#5a7a60;font-weight:400;font-size:9px">to '+ktgt.target+' (SD@'+ktgt.sd+')</span></div>';
+    if(savedHome&&savedAway){
+      scHTML+='<div class="vg"><div>';
+      if(canEdit){
+        scHTML+='<select class="ps'+(isPlateFill?' plate-fill':'')+'" data-mid="'+mid+'" data-side="h" data-idx="'+i+'" data-slot="0" onchange="koSelChange(this)">'+koMkOpts(savedHome,m.t,'h',i,0)+'</select>';
+        if(isD) scHTML+='<select class="ps'+(isPlateFill?' plate-fill':'')+'" data-mid="'+mid+'" data-side="h" data-idx="'+i+'" data-slot="1" onchange="koSelChange(this)">'+koMkOpts(savedHome,m.t,'h',i,1)+'</select>';
+      } else {
+        var hp0=(kd.players&&kd.players[mid+'_h_'+i+'_0'])||'—';
+        var hp1=isD?((kd.players&&kd.players[mid+'_h_'+i+'_1'])||'—'):'';
+        scHTML+='<div style="font-size:11px;color:var(--tx);padding:4px 2px">'+hp0+(hp1?' / '+hp1:'')+'</div>';
+      }
+      scHTML+='</div><div class="vt">vs</div><div>';
+      if(canEdit){
+        scHTML+='<select class="ps'+(isPlateFill?' plate-fill':'')+'" data-mid="'+mid+'" data-side="a" data-idx="'+i+'" data-slot="0" onchange="koSelChange(this)">'+koMkOpts(savedAway,m.t,'a',i,0)+'</select>';
+        if(isD) scHTML+='<select class="ps'+(isPlateFill?' plate-fill':'')+'" data-mid="'+mid+'" data-side="a" data-idx="'+i+'" data-slot="1" onchange="koSelChange(this)">'+koMkOpts(savedAway,m.t,'a',i,1)+'</select>';
+      } else {
+        var ap0=(kd.players&&kd.players[mid+'_a_'+i+'_0'])||'—';
+        var ap1=isD?((kd.players&&kd.players[mid+'_a_'+i+'_1'])||'—'):'';
+        scHTML+='<div style="font-size:11px;color:var(--tx);padding:4px 2px">'+ap0+(ap1?' / '+ap1:'')+'</div>';
+      }
+      scHTML+='</div></div>';
+    }
+    scHTML+='<div class="ko-scores" style="margin-top:6px"><div class="ko-match-name" style="font-size:10px;color:var(--t2)">Score</div>';
+    scHTML+='<input class="ko-si" type="number" min="0" max="99" id="ko_'+mid+'_h'+i+'" value="'+(s.h||'')+'" placeholder="0" inputmode="numeric" data-mid="'+mid+'" data-div="'+div+'" '+dis+' oninput="calcKObyAttr(this)">';
+    scHTML+='<div class="ko-dash">–</div>';
+    scHTML+='<input class="ko-si" type="number" min="0" max="99" id="ko_'+mid+'_a'+i+'" value="'+(s.a||'')+'" placeholder="0" inputmode="numeric" data-mid="'+mid+'" data-div="'+div+'" '+dis+' oninput="calcKObyAttr(this)">';
+    scHTML+='</div></div>';
+  }
+  if(div==='super'&&(savedHome||savedAway)) scHTML+='<p class="plate-note">★ Plate players eligible for Super Doubles &amp; Mixed Doubles fill-in only</p>';
 
   var html='<div class="ko-match">';
   html+='<div class="ko-match-lbl">'+match.label+'</div>';
   html+='<div class="ko-teams">';
-  html+='<input class="ko-team-inp" id="ko_'+match.id+'_home" value="'+savedHome+'" placeholder="Team name" data-mid="'+match.id+'" data-div="'+div+'" '+dis+' oninput="koTeamByAttr(this)" onchange="koTeamByAttr(this)">';
-  html+='<div class="ko-vs">VS</div>';
-  html+='<input class="ko-team-inp" id="ko_'+match.id+'_away" value="'+savedAway+'" placeholder="Team name" data-mid="'+match.id+'" data-div="'+div+'" '+dis+' oninput="koTeamByAttr(this)" onchange="koTeamByAttr(this)">';
-  html+='</div>';
-  if(savedHome||savedAway){
-    html+='<div class="ko-players-preview" id="ko_'+match.id+'_players">';
-    if(savedHome) html+='<strong>'+savedHome+':</strong> '+(hPlayers||'No lineup saved')+'<br>';
-    if(savedAway) html+='<strong>'+savedAway+':</strong> '+(aPlayers||'No lineup saved');
-    html+='</div>';
+  if(canEdit){
+    html+='<select class="ko-team-inp" id="ko_'+mid+'_home" data-mid="'+mid+'" data-div="'+div+'" onchange="koTeamByAttr(this)">'+teamOpts(savedHome)+'</select>';
+    html+='<div class="ko-vs">VS</div>';
+    html+='<select class="ko-team-inp" id="ko_'+mid+'_away" data-mid="'+mid+'" data-div="'+div+'" onchange="koTeamByAttr(this)">'+teamOpts(savedAway)+'</select>';
+  } else {
+    html+='<div class="ko-team-inp" style="padding:8px;font-weight:700">'+(savedHome||'TBD')+'</div>';
+    html+='<div class="ko-vs">VS</div>';
+    html+='<div class="ko-team-inp" style="padding:8px;font-weight:700">'+(savedAway||'TBD')+'</div>';
   }
+  html+='</div>';
+  if(!savedHome&&!savedAway&&canEdit) html+='<p style="font-size:11px;color:var(--t2);margin:8px 0">Select both teams above to enter lineups and scores.</p>';
   html+=scHTML;
-  html+='<div class="ko-result" id="ko_'+match.id+'_result">'+(kd.result||'')+'</div>';
-  if(canEdit) html+='<button class="ko-save-btn" data-mid="'+match.id+'" data-div="'+div+'" onclick="saveKObyAttr(this)">💾 Save Match</button>';
+  html+='<div class="ko-result" id="ko_'+mid+'_result">'+(kd.result||'')+'</div>';
+  if(canEdit) html+='<button class="ko-save-btn" data-mid="'+mid+'" data-div="'+div+'" onclick="saveKObyAttr(this)">💾 Save Match</button>';
   html+='</div>';
   return html;
+}
+
+function koSelChange(el){
+  var mid=el.getAttribute('data-mid');
+  var side=el.getAttribute('data-side');
+  var idx=parseInt(el.getAttribute('data-idx'));
+  var slot=parseInt(el.getAttribute('data-slot'));
+  if(!koData[mid]) koData[mid]={};
+  if(!koData[mid].players) koData[mid].players={};
+  koData[mid].players[mid+'_'+side+'_'+idx+'_'+slot]=el.value;
+  saveToStorage();
+  buildKnockout();
+}
+
+function koPlayerByAttr(el,side){
+  var matchId=el.getAttribute('data-mid');
+  if(!koData[matchId]) koData[matchId]={};
+  if(side==='home') koData[matchId].homeplayer=el.value;
+  else koData[matchId].awayplayer=el.value;
+  saveToStorage();
 }
 
 function getKoPlayers(div,team){
@@ -1242,7 +1346,17 @@ function calcKObyAttr(el){
 function koTeamByAttr(el){
   var mid=el.getAttribute('data-mid');
   var div=el.getAttribute('data-div');
-  if(mid&&div) koTeamChanged(mid,div);
+  if(!mid||!div) return;
+  var home=(document.getElementById('ko_'+mid+'_home')||{}).value||'';
+  var away=(document.getElementById('ko_'+mid+'_away')||{}).value||'';
+  if(!koData[mid]) koData[mid]={};
+  koData[mid].home=home;
+  koData[mid].away=away;
+  koData[mid].div=div;
+  // Clear saved players when team changes so dropdowns reset
+  koData[mid].players={};
+  saveToStorage();
+  buildKnockout();
 }
 function saveKObyAttr(el){
   var mid=el.getAttribute('data-mid');
