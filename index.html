@@ -457,6 +457,7 @@ function loadFromStorage(){
   db.ref('psl2026/scores').on('value',function(snap){
     var v=snap.val();
     if(v) scores=v;
+    if(!curRole) return; // not logged in yet
     renderTables();
     buildStatusDash();
     if(document.getElementById('pg-scoring')&&document.getElementById('pg-scoring').classList.contains('on')) buildScore();
@@ -467,6 +468,7 @@ function loadFromStorage(){
   });
   db.ref('psl2026/ko').on('value',function(snap){
     var v=snap.val();
+    if(!curRole) return;
     if(v) koData=v;
     renderKO();
   });
@@ -1466,10 +1468,8 @@ function doCSV(){
   document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 
-// Init on page load
-loadFromStorage();
+// Init on page load - only load ties for referee dropdown, Firebase listeners start after login
 loadTies();
-renderTables();
 </script>
 </body>
 </html>
