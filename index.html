@@ -450,10 +450,10 @@ function saveToStorage(){
     var cleanScores=JSON.parse(JSON.stringify(scores));
     var cleanLineups=JSON.parse(JSON.stringify(lineups));
     var cleanKo=JSON.parse(JSON.stringify(koData));
-    db.ref('psl2026/scores').set(cleanScores).catch(function(e){console.error('Scores save failed:',e);});
-    db.ref('psl2026/lineups').set(cleanLineups).catch(function(e){console.error('Lineups save failed:',e);});
-    db.ref('psl2026/ko').set(cleanKo).catch(function(e){console.error('KO save failed:',e);});
-  }catch(e){console.error('Save error:',e);}
+    db.ref('psl2026/scores').set(cleanScores).catch(function(e){alert('Score save failed: '+e.message);});
+    db.ref('psl2026/lineups').set(cleanLineups).catch(function(e){alert('Lineup save failed: '+e.message);});
+    db.ref('psl2026/ko').set(cleanKo).catch(function(e){alert('KO save failed: '+e.message);});
+  }catch(e){alert('Save error: '+e.message);}
 }
 
 var fbListenersAttached=false;
@@ -559,19 +559,24 @@ function doLogin(){
 }
 
 function doLogout(){
-  curRole=null;refTieIdx=null;
-  db.ref('psl2026/scores').off();
-  db.ref('psl2026/lineups').off();
-  db.ref('psl2026/ko').off();
+  try{
+    db.ref('psl2026/scores').off();
+    db.ref('psl2026/lineups').off();
+    db.ref('psl2026/ko').off();
+  }catch(e){}
+  curRole=null;
+  refTieIdx=null;
   fbListenersAttached=false;
   sessionStorage.removeItem('psl_role');
-  document.getElementById('app-wrap').style.display='none';
-  document.getElementById('login-page').style.display='flex';
+  sessionStorage.removeItem('psl_ref_tie');
+  // Reset UI first before hiding
   document.getElementById('inp-pin').value='';
   document.getElementById('sel-role').value='';
   document.getElementById('ref-div').style.display='none';
   document.getElementById('lerr').textContent='';
-  goPage('home','nb-home');
+  // Switch pages
+  document.getElementById('app-wrap').style.display='none';
+  document.getElementById('login-page').style.display='flex';
 }
 
 // ── NAV ──
