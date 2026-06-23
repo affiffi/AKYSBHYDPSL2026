@@ -224,13 +224,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--dk
 
   <!-- LINEUP -->
   <div id="pg-lineup" class="pg">
-    <div class="ph"><div class="ptt">Lineup</div></div>
+    <div class="ph"><div class="ptt">Lineup<button class="sobt" onclick="doLogout()">Sign Out</button></div></div>
     <div id="lu-wrap"></div>
   </div>
 
   <!-- SCORING -->
   <div id="pg-scoring" class="pg">
-    <div class="ph"><div class="ptt">Score</div></div>
+    <div class="ph"><div class="ptt">Score<button class="sobt" onclick="doLogout()">Sign Out</button></div></div>
     <div id="rbar" class="rbar" style="display:none"></div>
     <div class="card" id="sc-select-card">
       <label class="fl">Division</label>
@@ -257,7 +257,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--dk
 
   <!-- TABLES -->
   <div id="pg-tables" class="pg">
-    <div class="ph"><div class="ptt">Tables</div></div>
+    <div class="ph"><div class="ptt">Tables<button class="sobt" onclick="doLogout()">Sign Out</button></div></div>
     <div class="tbr">
       <button class="tbt on" onclick="showTab('t-sup',this)">Super</button>
       <button class="tbt" onclick="showTab('t-pla',this)">Plate</button>
@@ -295,7 +295,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--dk
 
   <!-- KNOCKOUT -->
   <div id="pg-knockout" class="pg">
-    <div class="ph"><div class="ptt">Knockout</div></div>
+    <div class="ph"><div class="ptt">Knockout<button class="sobt" onclick="doLogout()">Sign Out</button></div></div>
     <div class="ko-div-tabs">
       <button class="ko-tab on" onclick="showKoDiv('ko-super',this)">Super</button>
       <button class="ko-tab" onclick="showKoDiv('ko-plate',this)">Plate</button>
@@ -550,6 +550,8 @@ function doLogin(){
     var st=document.getElementById('sc-tie');
     sc.disabled=false; st.disabled=false; // viewing can browse but not save
   }
+  sessionStorage.setItem('psl_role', role);
+  if(role==='referee') sessionStorage.setItem('psl_ref_tie', refTieIdx);
   buildHome();
   loadTies();
   renderTables();
@@ -562,6 +564,7 @@ function doLogout(){
   db.ref('psl2026/lineups').off();
   db.ref('psl2026/ko').off();
   fbListenersAttached=false;
+  sessionStorage.removeItem('psl_role');
   document.getElementById('app-wrap').style.display='none';
   document.getElementById('login-page').style.display='flex';
   document.getElementById('inp-pin').value='';
@@ -868,7 +871,7 @@ function buildScore(){
     var tgt=getMatchTarget(m.t);
     var target=tgt.target, sd=tgt.sd;
     var s=(sv.ms||[])[i]||{h:'',a:''};
-    var lu=lineups[luBase+'_'+i]||lineups[rkey+'_'+i]||lineups['super_'+home+'_'+away+'_'+i]||lineups['plate_'+home+'_'+away+'_'+i]||{};
+    var lu=lineups['super_'+home+'_'+away+'_'+i]||lineups['plate_'+home+'_'+away+'_'+i]||lineups[luBase+'_'+i]||lineups[rkey+'_'+i]||{};
     var hL=[lu.h0,lu.h1].filter(function(x){return x;}).join(' / ')||home;
     var aL=[lu.a0,lu.a1].filter(function(x){return x;}).join(' / ')||away;
     var disabled=canEdit?'':' disabled';
@@ -1488,7 +1491,24 @@ function doCSV(){
 
 // Init on page load
 loadTies();
-renderTables();
+// Auto-restore session if page was refreshed
+(function(){
+  var savedRole=sessionStorage.getItem('psl_role');
+  if(savedRole){
+    curRole=savedRole;
+    var savedTie=sessionStorage.getItem('psl_ref_tie');
+    if(savedTie!==null) refTieIdx=parseInt(savedTie);
+    document.getElementById('rbd').textContent=savedRole.toUpperCase();
+    document.getElementById('rbd').className='rbd on';
+    document.getElementById('login-page').style.display='none';
+    document.getElementById('app-wrap').style.display='block';
+    loadFromStorage();
+    buildHome();
+    loadTies();
+    renderTables();
+    buildKnockout();
+  }
+})();
 </script>
 </body>
 </html>
